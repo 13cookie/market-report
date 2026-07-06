@@ -87,13 +87,15 @@ def fetch_feed(name, url):
 
 
 def fetch_crypto_prices():
-    """CoinGecko:BTC/ETH 現價與漲跌幅(免金鑰)。"""
+    """CoinGecko:市值前 10 大幣種現價與漲跌幅(免金鑰),BTC/ETH 必含其中。"""
     try:
         r = requests.get(
             "https://api.coingecko.com/api/v3/coins/markets",
             params={
                 "vs_currency": "usd",
-                "ids": "bitcoin,ethereum",
+                "order": "market_cap_desc",
+                "per_page": 10,
+                "page": 1,
                 "price_change_percentage": "24h,7d",
             },
             timeout=20,
@@ -102,7 +104,7 @@ def fetch_crypto_prices():
         lines = []
         for c in r.json():
             lines.append(
-                "{sym}: ${price:,.0f} | 24h {d1:+.2f}% | 7d {d7:+.2f}%".format(
+                "{sym}: ${price:,.4g} | 24h {d1:+.2f}% | 7d {d7:+.2f}%".format(
                     sym=c["symbol"].upper(),
                     price=c["current_price"],
                     d1=c.get("price_change_percentage_24h_in_currency") or 0,
@@ -113,6 +115,30 @@ def fetch_crypto_prices():
     except Exception as e:
         print(f"[warn] CoinGecko 失敗: {e}", file=sys.stderr)
         return "(行情抓取失敗)"
+
+
+def fetch_trending_coins():
+    """CoinGecko:目前熱搜/熱門幣種(免金鑰)。"""
+    try:
+        r = requests.get(
+            "https://api.coingecko.com/api/v3/search/trending", timeout=20
+        )
+        r.raise_for_status()
+        coins = r.json().get("coins", [])[:7]
+        lines = []
+        for c in coins:
+            item = c.get("item", {})
+            lines.append(
+                "{name} ({sym}) | 市值排名:{rank}".format(
+                    name=item.get("name", "?"),
+                    sym=str(item.get("symbol", "?")).upper(),
+                    rank=item.get("market_cap_rank", "?"),
+                )
+            )
+        return "\n".join(lines) if lines else "(無資料)"
+    except Exception as e:
+        print(f"[warn] CoinGecko 熱搜失敗: {e}", file=sys.stderr)
+        return "(熱搜幣種抓取失敗)"
 
 
 def fetch_taiex():
@@ -164,14 +190,17 @@ def collect_news(feeds):
     return "\n".join(items) if items else "(今日無可用新聞來源)"
 
 
-def analyze_with_claude(crypto_prices, taiex, top_stocks, crypto_news, tw_news):
+def analyze_with_claude(crypto_prices, trending, taiex, top_stocks, crypto_news, tw_news):
     is_weekend = NOW.weekday() >= 5  # 週六=5、週日=6
     weekend_note = "今天是週末,台股休市,台股部分請以上一交易日與展望為主。" if is_weekend else ""
 
     prompt = f"""你是專業的市場分析師。以下是 {NOW:%Y-%m-%d}(台灣時間)早晨蒐集的市場資料,請撰寫一份「每日市場晨報」。
 
-【幣圈行情】
+【幣圈行情:市值前 10 大幣種】
 {crypto_prices}
+
+【幣圈目前熱搜幣種】
+{trending}
 
 【台股行情】
 {taiex}
@@ -186,9 +215,10 @@ def analyze_with_claude(crypto_prices, taiex, top_stocks, crypto_news, tw_news):
 {tw_news}
 
 撰寫要求:
-1. 全部使用繁體中文,總長度嚴格控制在 700 字以內(這會透過 LINE 傳送)。
-2. 結構共三段:
-   ▌幣圈(BTC/ETH 為主):當前局勢重點 2-3 點、未來走向觀察 1-2 點。
+1. 全部使用繁體中文,總長度嚴格控制在 900 字以內(這會透過 LINE 傳送)。
+2. 結構共四段:
+   ▌幣圈大盤(BTC/ETH 為主):當前局勢重點 2-3 點、未來走向觀察 1-2 點。
+   ▌亮點幣種:從前 10 大漲跌數據、熱搜榜與新聞中挑出 2-3 個當前最受關注的幣種(BTC/ETH 以外優先),每個一行,格式:幣名(代號)|受關注原因|短期走勢方向研判(偏多/偏空/區間觀望)加一句理由。只挑資料中有依據的幣種,不可憑空捏造。
    ▌台股大盤與總經:當前局勢重點 2 點、未來走向觀察 1 點。
    ▌亮點個股:從成交量排行與新聞中挑出 2-3 檔當前最受市場關注的台股個股,每檔一行,格式:股名(代號)|受關注原因|短期走勢方向研判(偏多/偏空/區間觀望)加一句理由。只挑資料中有依據的個股,不可憑空捏造。
 3. 用純文字排版(可用 emoji 與「▌」「•」符號),不要用 Markdown 語法(不要 # 和 **)。
@@ -235,13 +265,14 @@ def push_line(text):
 def main():
     print("抓取行情…")
     crypto_prices = fetch_crypto_prices()
+    trending = fetch_trending_coins()
     taiex = fetch_taiex()
     top_stocks = fetch_top_volume_stocks()
     print("抓取新聞…")
     crypto_news = collect_news(CRYPTO_FEEDS)
     tw_news = collect_news(TAIWAN_FEEDS)
     print("Claude 分析中…")
-    report = analyze_with_claude(crypto_prices, taiex, top_stocks, crypto_news, tw_news)
+    report = analyze_with_claude(crypto_prices, trending, taiex, top_stocks, crypto_news, tw_news)
     print("推送 LINE…")
     push_line(report)
     print("完成 ✅")
