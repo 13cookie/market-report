@@ -1,6 +1,6 @@
 # 每日市場晨報(幣圈 + 台股)→ LINE 自動推送
 
-每天台灣時間早上 8 點,自動抓取 BTC/ETH 行情、台股加權指數,以及中英文市場新聞,交由 Claude API 產生 500 字以內的繁體中文分析,透過 LINE 官方帳號推送到你的 LINE。
+每天台灣時間早上約 7:30,自動抓取 BTC/ETH 行情、台股加權指數,以及中英文市場新聞,交由 Claude API 產生 500 字以內的繁體中文分析,透過 LINE 官方帳號推送到你的 LINE。
 
 > ⚠️ 報告為 AI 自動彙整之市場觀察,僅供參考,不構成投資建議。
 
@@ -10,15 +10,19 @@
 market-report/
 ├── main.py                          # 主程式
 ├── requirements.txt                 # 套件清單
+├── LICENSE                          # MIT 授權
 └── .github/workflows/daily_report.yml  # GitHub Actions 排程
 ```
 
 ## 部署步驟(約 15 分鐘)
 
-### 1. 建立 GitHub Repo 並上傳程式
+### 1. Fork 本專案
 
-1. 登入 GitHub → 右上角「+」→ New repository → 命名(例如 `market-report`)→ 選 **Private** → Create。
-2. 把本專案三個檔案照原本的資料夾結構上傳(網頁上傳時,`.github/workflows/daily_report.yml` 可用「Add file → Create new file」,檔名直接輸入 `.github/workflows/daily_report.yml`,GitHub 會自動建立資料夾)。
+點本頁右上角 **Fork**,複製一份到你自己的 GitHub 帳號(公開或私人都可以)。
+
+> 金鑰一律存在 GitHub Secrets,不會寫進程式碼,Fork 也不會帶走原作者的 Secrets,所以公開 repo 也安全。
+
+Fork 之後到你的 repo → **Actions** 分頁 → 按「I understand my workflows, go ahead and enable them」啟用排程。
 
 ### 2. 取得三把鑰匙
 
@@ -40,7 +44,7 @@ Repo → **Actions** 分頁 → 左側選「Daily Market Report」→ 右側 **R
 
 ### 5. 完成
 
-之後每天 UTC 00:00(台灣 08:00)自動執行。GitHub 排程尖峰時可能延遲 5-15 分鐘,屬正常現象。
+之後每天 UTC 23:23(台灣 07:23)自動執行。GitHub 排程尖峰時可能延遲 5-15 分鐘,屬正常現象。
 
 ## 常見調整
 
@@ -54,3 +58,7 @@ Repo → **Actions** 分頁 → 左側選「Daily Market Report」→ 右側 **R
 - **LINE 收不到**:確認已加官方帳號好友;確認 `LINE_USER_ID` 是 Basic settings 的 Your user ID,不是 LINE ID;免費方案每月推送則數有上限(個人使用綽綽有餘)。
 - **Actions 沒自動跑**:Repo 若 60 天無任何活動,GitHub 會暫停排程,到 Actions 頁按 Enable 即可恢復;偶爾 commit 一下也可避免。
 - **Claude API 錯誤 401/403**:API Key 貼錯或帳戶未儲值。
+
+## 授權
+
+[MIT](LICENSE)。歡迎 Fork、修改、發 Issue 或 PR。
